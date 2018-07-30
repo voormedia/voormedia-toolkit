@@ -1,0 +1,36 @@
+[[constraint]]
+name = "github.com/spf13/cobra"
+branch = "master"
+
+[[constraint]]
+name = "k8s.io/kubectl"
+branch = "master"
+
+[[constraint]]
+name = "k8s.io/kubernetes"
+version = "1.9.2"
+
+[[override]]
+name = "k8s.io/client-go"
+version = "kubernetes-1.9.2"
+
+[[override]]
+name = "k8s.io/api"
+version = "kubernetes-1.9.2"
+
+[[override]]
+name = "github.com/russross/blackfriday"
+version = "1.5.0"
+
+[[constraint]]
+name = "github.com/docker/distribution"
+revision = "30578ca32960a4d368bf6db67b0a33c2a1f3dc6f"
+
+[[constraint]]
+name = "github.com/docker/cli"
+branch = "master"
+
+[[constraint]]
+name = "github.com/docker/docker"
+branch = "master"
+# version = "17.05.0-ce"
