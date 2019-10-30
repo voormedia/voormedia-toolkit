@@ -10,13 +10,13 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/gsql/pkg/util"
+	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 )
 
 // Run Google Cloud SQL proxy container
-func Run(log *util.Logger) error {
+func Run(log *util.Logger, port string) error {
 	sqlInstances, err := findSQLInstances()
 	if err != nil {
 		return err
@@ -44,19 +44,13 @@ func Run(log *util.Logger) error {
 		return err
 	}
 
-	credentialFile, err := findCredentialFile()
-	if err != nil {
-		return err
-	}
-
 	proxyFile, err := findProxyFile()
 	if err != nil {
 		return err
 	}
 
 	args := []string{
-		"-instances", connectionName + "=tcp:3307",
-		"-credential_file", credentialFile,
+		"-instances", connectionName + "=tcp:" + port,
 	}
 
 	cmd := exec.Command(proxyFile, args...)
@@ -95,19 +89,6 @@ func findConnectionName(instance string) (string, error) {
 
 	result := strings.Split(out.String(), "\n")
 	return strings.TrimSpace(result[:len(result)-1][1]), nil
-}
-
-func findCredentialFile() (string, error) {
-	// TODO: Implement more flexible solution for storing/retrieving credentials
-	credentialFile, err := homedir.Expand("~/gcloud_proxy.json")
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := os.Stat(credentialFile); os.IsNotExist(err) {
-		return "", errors.Errorf("Credentials file `gcloud_proxy.json` does not exist in the home directory.")
-	}
-	return credentialFile, nil
 }
 
 func findProxyFile() (string, error) {

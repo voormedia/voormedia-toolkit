@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/emielvanlankveld/gsql/cmd"
+	"github.com/emielvanlankveld/voormedia-toolkit/cmd"
 )
 
 func main() {

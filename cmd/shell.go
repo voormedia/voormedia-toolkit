@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/gsql/pkg/shell"
+	"github.com/emielvanlankveld/voormedia-toolkit/pkg/shell"
 	"github.com/spf13/cobra"
 )
 

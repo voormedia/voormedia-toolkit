@@ -1,18 +1,18 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/gsql/pkg/util"
+	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	"github.com/spf13/cobra"
 )
 
 var version = "master"
-var log = util.NewLogger("gsql")
+var log = util.NewLogger("voormedia-toolkit")
 
 var verbose bool
 
 var cmdRoot = &cobra.Command{
-	Use:   "gsql",
-	Short: "Perform actions on Google Cloud SQL databases.",
+	Use:   "vmt",
+	Short: "Useful utilities related to apps deployed on Google Cloud.",
 }
 
 func init() {

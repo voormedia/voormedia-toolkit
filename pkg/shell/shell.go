@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/gsql/pkg/util"
+	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	"github.com/pkg/errors"
 )
 
