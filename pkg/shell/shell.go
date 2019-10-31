@@ -1,21 +1,17 @@
 package shell
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/AlecAivazis/survey"
 	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
-	"github.com/pkg/errors"
 )
 
 // Run a shell of a Google Cloud SQL database of choice.
 func Run(log *util.Logger) error {
-	sqlInstances, err := findSQLInstances()
+	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err
 	}
@@ -37,7 +33,7 @@ func Run(log *util.Logger) error {
 		return err
 	}
 
-	sqlDatabases, err := findSQLDatabases(instanceSelection.Instance)
+	sqlDatabases, err := util.FindSQLDatabases(instanceSelection.Instance)
 	if err != nil {
 		return err
 	}
@@ -76,38 +72,4 @@ func Run(log *util.Logger) error {
 	cmd.Stdout = os.Stdout
 	cmd.Run()
 	return nil
-}
-
-func findSQLInstances() ([]string, error) {
-	cmd := exec.Command("gcloud", "sql", "instances", "list", "--uri")
-	var out, errOut bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errOut
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Errorf("Failed to get SQL instances: %s", errOut.String())
-	}
-
-	instances := strings.Split(out.String(), "\n")
-	for i, instance := range instances[:len(instances)-1] {
-		instances[i] = filepath.Base(instance)
-	}
-
-	return instances, nil
-}
-
-func findSQLDatabases(instance string) ([]string, error) {
-	cmd := exec.Command("gcloud", "sql", "databases", "list", "-i", instance, "--uri")
-	var out, errOut bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errOut
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Errorf("Failed to get SQL databases: %s", errOut.String())
-	}
-
-	databases := strings.Split(out.String(), "\n")
-	for i, database := range databases[:len(databases)-1] {
-		databases[i] = filepath.Base(database)
-	}
-
-	return databases, nil
 }

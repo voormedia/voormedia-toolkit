@@ -1,14 +1,10 @@
 package restore
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey"
@@ -17,47 +13,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-type databaseConfig struct {
-	Development struct {
-		Hostname    string
-		Port        string
-		Database    string
-		Username    string
-		Password    string
-		Environment string
-	}
-	Acceptance struct {
-		Hostname    string
-		Port        string
-		Database    string
-		Username    string
-		Password    string
-		Environment string
-	}
-	Production struct {
-		Hostname    string
-		Port        string
-		Database    string
-		Username    string
-		Password    string
-		Environment string
-	}
-}
-
-type targetConfig struct {
-	Hostname    string
-	Port        string
-	Database    string
-	Username    string
-	Password    string
-	Environment string
-}
-
 // Run backup download (from Backblaze) and restore of a Google Cloud SQL database
 func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, b2encrypt string, b2bucketName string,
 	configFile string, targetPort string, targetHost string, targetUsername string, targetPassword string, targetDatabase string) error {
 
-	sqlInstances, err := findSQLInstances()
+	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err
 	}
@@ -79,7 +39,7 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 		return err
 	}
 
-	sqlDatabases, err := findSQLDatabases(instanceSelection.Instance)
+	sqlDatabases, err := util.FindSQLDatabases(instanceSelection.Instance)
 	if err != nil {
 		return err
 	}
@@ -101,7 +61,7 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 		return err
 	}
 
-	b2Context, b2Bucket, err := util.B2Bucket(b2id, b2key, b2bucketName)
+	b2Context, b2Bucket, b2encrypt, err := util.B2Bucket(b2id, b2key, b2bucketName, b2encrypt, false)
 	if err != nil {
 		return err
 	}
@@ -128,50 +88,18 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 		return err
 	}
 
-	target := targetConfig{}
-	if targetDatabase == "" {
-		yamlFile, err := ioutil.ReadFile(configFile)
-		if err != nil {
-			return err
-		}
-
-		dbConfig := databaseConfig{}
-		err = yaml.Unmarshal(yamlFile, &dbConfig)
-		if err != nil {
-			return err
-		}
-
-		if targetEnvironment == "development" {
-			target = dbConfig.Development
-		} else if targetEnvironment == "acceptance" {
-			target = dbConfig.Acceptance
-		} else if targetEnvironment == "production" {
-			target = dbConfig.Production
-		} else {
-			return errors.Errorf("Invalid target specified: " + targetEnvironment)
-		}
-	} else {
-		target.Database = targetDatabase
-		target.Username = targetUsername
-		target.Password = targetPassword
-		targetEnvironment = "custom"
-	}
-
-	target.Hostname = targetHost
-	target.Port = targetPort
-	target.Environment = targetEnvironment
-
-	if target.Database == "" {
-		return errors.Errorf("Could not find a database belonging to the target")
+	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetUsername, targetPassword, targetHost, targetPort, configFile)
+	if err != nil {
+		return err
 	}
 
 	file := ""
 	splitFileName := strings.Split(backupSelection.Backup, "/")
 	if _, err := os.Stat("/tmp/" + splitFileName[len(splitFileName)-1]); err == nil {
-		fmt.Printf("Selected Backblaze backup has already been downloaded. Using file on disk to restore on the " + targetEnvironment + " environment...\n")
+		fmt.Printf("Selected Backblaze backup has already been downloaded. Using file on disk to restore on the " + target.Environment + " environment...\n")
 		file = strings.Replace("/tmp/"+splitFileName[len(splitFileName)-1], ".encrypted", "", 1)
 	} else {
-		fmt.Printf("Downloading Backblaze backup to restore it on the " + targetEnvironment + " environment...\n")
+		fmt.Printf("Downloading Backblaze backup to restore it on the " + target.Environment + " environment...\n")
 		file, err = downloadBackup(b2Context, backupSelection.Backup, b2Bucket, b2encrypt)
 		if err != nil {
 			return err
@@ -191,40 +119,6 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 	}
 
 	return nil
-}
-
-func findSQLInstances() ([]string, error) {
-	cmd := exec.Command("gcloud", "sql", "instances", "list", "--uri")
-	var out, errOut bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errOut
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Errorf("Failed to get SQL instances: %s", errOut.String())
-	}
-
-	instances := strings.Split(out.String(), "\n")
-	for i, instance := range instances[:len(instances)-1] {
-		instances[i] = filepath.Base(instance)
-	}
-
-	return instances, nil
-}
-
-func findSQLDatabases(instance string) ([]string, error) {
-	cmd := exec.Command("gcloud", "sql", "databases", "list", "-i", instance, "--uri")
-	var out, errOut bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errOut
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Errorf("Failed to get SQL databases: %s", errOut.String())
-	}
-
-	databases := strings.Split(out.String(), "\n")
-	for i, database := range databases[:len(databases)-1] {
-		databases[i] = filepath.Base(database)
-	}
-
-	return databases, nil
 }
 
 func findSQLBackups(ctx context.Context, database string, bucket *b2.Bucket) ([]string, error) {
@@ -257,7 +151,7 @@ func downloadBackup(ctx context.Context, file string, bucket *b2.Bucket, encrypt
 	return localFile, nil
 }
 
-func restoreBackupToMySQL(target targetConfig, backup string) error {
+func restoreBackupToMySQL(target util.TargetConfig, backup string) error {
 	fmt.Printf("Restoring to MySQL database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n")
 
 	// Attempt to create the database in case it doesn't exist
@@ -276,8 +170,8 @@ func restoreBackupToMySQL(target targetConfig, backup string) error {
 	return nil
 }
 
-func restoreBackupToPostgres(target targetConfig, backup string) error {
-	fmt.Printf("Restoring to Postgres database " + target.Database + " (port " + target.Port + ")...\n")
+func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
+	fmt.Printf("Restoring to Postgres database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n")
 
 	if target.Environment != "development" {
 		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-U", target.Username, "-f", backup)
