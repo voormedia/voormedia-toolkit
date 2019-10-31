@@ -39,7 +39,7 @@ func init() {
 	cmdRestore.Flags().String("dbconfig", "./config/database.yml", "Specifies the location of the application's database configuration file")
 	cmdRestore.Flags().String("port", "3306", "Specifies the port to use when restoring the target database")
 	cmdRestore.Flags().String("host", "127.0.0.1", "Specifies the host to use when restoring the target database.")
-	cmdRestore.Flags().String("user", "", "Specifies the user to use when restoring the target database. Only used when the database flag is also specified.")
+	cmdRestore.Flags().String("user", "root", "Specifies the user to use when restoring the target database. Will be overriden by the database configuration file if applicable.")
 	cmdRestore.Flags().String("password", "", "Specifies the password to use when restoring the target database. Only used when the database flag is also specified.")
 	cmdRestore.Flags().String("database", "", "Specifies the name of the target database. Setting this option will override the configuration file.")
 }
