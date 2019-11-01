@@ -130,10 +130,24 @@ func backupFromMySQL(target util.TargetConfig) (string, error) {
 }
 
 func backupFromPostgres(target util.TargetConfig) (string, error) {
-	fmt.Printf("Backing up Postgres database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n")
+	fmt.Printf("Backing up Postgres database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n" +
+		"You may have to enter a password for user " + target.Username + "\n")
+
+	fileName := target.Database + "_" + time.Now().Format("2006-01-02_15:04:05") + ".sql"
 
 	cmd := exec.Command("pg_dump", "-U", target.Username, "-h", target.Hostname, "-p", target.Port, "--format=plain", "--no-owner", "--no-acl", "--clean", "-c", target.Database)
-	cmd.Run()
+	outfile, err := os.Create("/tmp/" + fileName)
+	if err != nil {
+		return "", err
+	}
+	defer outfile.Close()
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = outfile
 
-	return "", nil
+	err = cmd.Run()
+	if err != nil {
+		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n")
+	}
+
+	return fileName, nil
 }
