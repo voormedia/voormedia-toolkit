@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -26,7 +27,7 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 		{
 			Name: "instance",
 			Prompt: &survey.Select{
-				Message: "Choose an instance:",
+				Message: "Choose a source instance:",
 				Options: sqlInstances,
 			},
 		},
@@ -97,7 +98,6 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 	splitFileName := strings.Split(backupSelection.Backup, "/")
 	if _, err := os.Stat("/tmp/" + splitFileName[len(splitFileName)-1]); err == nil {
 		fmt.Printf("Selected Backblaze backup has already been downloaded. Using file on disk to restore on the " + target.Environment + " environment...\n")
-		file = strings.Replace("/tmp/"+splitFileName[len(splitFileName)-1], ".encrypted", "", 1)
 	} else {
 		fmt.Printf("Downloading Backblaze backup to restore it on the " + target.Environment + " environment...\n")
 		file, err = downloadBackup(b2Context, backupSelection.Backup, b2Bucket, b2encrypt)
@@ -105,6 +105,8 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 			return err
 		}
 	}
+
+	file = strings.Replace("/tmp/"+splitFileName[len(splitFileName)-1], ".encrypted", "", 1)
 
 	if strings.Contains(instanceSelection.Instance, "mysql") {
 		err = restoreBackupToMySQL(target, file)
@@ -159,12 +161,16 @@ func restoreBackupToMySQL(target util.TargetConfig, backup string) error {
 	cmd.Run()
 
 	cmd = exec.Command("mysql", "-u", target.Username, "-h", target.Hostname, "--password="+target.Password, "-P", target.Port, target.Database, "-e", "source "+backup)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
 		if target.Environment != "development" {
-			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n")
+			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + stderr.String())
 		}
-		return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n")
+		return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n\n" + stderr.String())
 	}
 
 	return nil

@@ -22,7 +22,7 @@ func Run(log *util.Logger, port string, host string, b2id string, b2key string, 
 		{
 			Name: "instance",
 			Prompt: &survey.Select{
-				Message: "Choose an instance:",
+				Message: "Choose a source instance:",
 				Options: sqlInstances,
 			},
 		},
