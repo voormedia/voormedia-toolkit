@@ -1,14 +1,15 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/restore"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/voormedia/voormedia-toolkit/pkg/restore"
 )
 
 var cmdRestore = &cobra.Command{
-	Use:   "restore",
-	Short: "Download and restore a Backblaze backup of a Google Cloud SQL database.",
+	Use:                   "restore",
+	Short:                 "Download and restore a Backblaze backup of a Google Cloud SQL database.",
 	DisableFlagsInUseLine: true,
 
 	Run: func(cmd *cobra.Command, args []string) {

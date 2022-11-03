@@ -2,13 +2,14 @@ package backup
 
 import (
 	"fmt"
-	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
-	"github.com/pkg/errors"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/AlecAivazis/survey"
+	"github.com/pkg/errors"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 // Run backup creation and stores it in Backblaze B2.
@@ -95,7 +96,7 @@ func Run(log *util.Logger, port string, host string, b2id string, b2key string, 
 		}
 	}
 
-	cmd := exec.Command("openssl", "aes-256-cbc", "-in", "/tmp/"+file, "-out", "/tmp/"+file+".encrypted", "-pass", "pass:"+b2encrypt)
+	cmd := exec.Command("openssl", "aes-256-cbc", "-md", "md5", "-in", "/tmp/"+file, "-out", "/tmp/"+file+".encrypted", "-pass", "pass:"+b2encrypt)
 	cmd.Run()
 
 	err = util.B2Upload(b2Context, b2Bucket, databaseSelection.Database, file+".encrypted")

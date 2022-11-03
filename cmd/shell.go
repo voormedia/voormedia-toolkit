@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/shell"
 	"github.com/spf13/cobra"
+	"github.com/voormedia/voormedia-toolkit/pkg/shell"
 )
 
 var cmdShell = &cobra.Command{
-	Use:   "shell",
-	Short: "Run a shell of a Google Cloud SQL database.",
+	Use:                   "shell",
+	Short:                 "Run a shell of a Google Cloud SQL database.",
 	DisableFlagsInUseLine: true,
 
 	Run: func(_ *cobra.Command, args []string) {

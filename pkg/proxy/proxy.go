@@ -8,9 +8,9 @@ import (
 	"runtime"
 
 	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 // Run Google Cloud SQL proxy container

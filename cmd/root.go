@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	"github.com/spf13/cobra"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 var version = "master"

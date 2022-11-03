@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/emielvanlankveld/voormedia-toolkit/cmd"
+	"github.com/voormedia/voormedia-toolkit/cmd"
 )
 
 func main() {

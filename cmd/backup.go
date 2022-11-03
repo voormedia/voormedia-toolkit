@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/backup"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/voormedia/voormedia-toolkit/pkg/backup"
 )
 
 var cmdBackup = &cobra.Command{

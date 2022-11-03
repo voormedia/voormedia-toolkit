@@ -75,7 +75,7 @@ func B2Object(ctx context.Context, bucket *b2.Bucket, fileName string, encryptio
 	}
 
 	f.Close()
-	cmd := exec.Command("openssl", "aes-256-cbc", "-d", "-in", target, "-out", strings.Replace(target, ".encrypted", "", 1), "-pass", "pass:"+encryptionKey)
+	cmd := exec.Command("openssl", "aes-256-cbc", "-md", "md5", "-d", "-in", target, "-out", strings.Replace(target, ".encrypted", "", 1), "-pass", "pass:"+encryptionKey)
 	cmd.Run()
 
 	return target, nil

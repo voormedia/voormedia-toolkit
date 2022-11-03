@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 // Run a shell of a Google Cloud SQL database of choice.

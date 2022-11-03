@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey"
-	"github.com/emielvanlankveld/voormedia-toolkit/pkg/util"
 	"github.com/kurin/blazer/b2"
 	"github.com/pkg/errors"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 // Run backup download (from Backblaze) and restore of a Google Cloud SQL database
