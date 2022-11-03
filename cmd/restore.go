@@ -36,7 +36,7 @@ func init() {
 	cmdRestore.Flags().String("b2id", os.Getenv("B2_ACCOUNT_ID"), "Specifies the Backblaze B2 account ID")
 	cmdRestore.Flags().String("b2key", os.Getenv("B2_ACCOUNT_KEY"), "Specifies the Backblaze B2 account key")
 	cmdRestore.Flags().String("b2encrypt", os.Getenv("B2_ENCRYPTION_KEY"), "Specifies the Backblaze B2 encryption key")
-	cmdRestore.Flags().String("b2bucket", "voormedia-db-backups", "Specifies the Backblaze B2 backup bucket")
+	cmdRestore.Flags().String("b2bucket", "voormedia-eu-db-backups", "Specifies the Backblaze B2 backup bucket")
 	cmdRestore.Flags().String("dbconfig", "./config/database.yml", "Specifies the location of the application's database configuration file")
 	cmdRestore.Flags().String("port", "3306", "Specifies the port to use when restoring the target database")
 	cmdRestore.Flags().String("host", "127.0.0.1", "Specifies the host to use when restoring the target database.")
