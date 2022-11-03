@@ -4,7 +4,9 @@
 
 ### Option 1 – prebuilt
 1. Ensure you have `~/.bin` directory or similar that is in your `$PATH`
-2. Install Voormedia Toolkit: `curl -L $(curl -s https://api.github.com/repos/voormedia/voormedia-toolkit/releases/latest | grep browser_download_url | grep darwin_amd64 | cut -d '"' -f 4) -o ~/.bin/vmt && chmod +x ~/.bin/vmt`
+2. Install Voormedia Toolkit
+- When using an Apple M1+ Mac run: `rm -f ~/.bin/vmt && curl -L $(curl -s https://api.github.com/repos/voormedia/voormedia-toolkit/releases/latest | grep browser_download_url | grep darwin_arm64 | cut -d '"' -f 4) -o ~/.bin/vmt && chmod +x ~/.bin/vmt`
+- When using an Intel Mac run: `rm -f ~/.bin/vmt && curl -L $(curl -s https://api.github.com/repos/voormedia/voormedia-toolkit/releases/latest | grep browser_download_url | grep darwin_amd64 | cut -d '"' -f 4) -o ~/.bin/vmt && chmod +x ~/.bin/vmt`
 
 ### Option 2 – from source
 1. Make sure you have a working `go` installation
