@@ -3,7 +3,6 @@ package util
 import (
 	"io/ioutil"
 
-	"github.com/oleiade/reflections"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
@@ -25,30 +24,17 @@ type DatabaseConfig struct {
 	Production  TargetConfig
 }
 
-type ShardedTargetConfig struct {
-	Receptel TargetConfig
-	Bouwens  TargetConfig
-}
+type ShardedTargetConfig = map[string]TargetConfig
 
 type ShardedDatabaseConfig struct {
-	Development struct {
-		Receptel TargetConfig
-		Bouwens  TargetConfig
-	}
-	Acceptance struct {
-		Receptel TargetConfig
-		Bouwens  TargetConfig
-	}
-	Production struct {
-		Receptel TargetConfig
-		Bouwens  TargetConfig
-	}
+	Development ShardedTargetConfig
+	Acceptance  ShardedTargetConfig
+	Production  ShardedTargetConfig
 }
 
 // GetDatabaseConfig based on provided arguments
 func GetDatabaseConfig(database string, environment string, shard string, user string, password string, host string, port string, configFile string) (TargetConfig, error) {
 	target := TargetConfig{}
-	shardedTarget := ShardedTargetConfig{}
 	if database == "" {
 		yamlFile, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -62,6 +48,7 @@ func GetDatabaseConfig(database string, environment string, shard string, user s
 				return target, err
 			}
 
+			shardedTarget := ShardedTargetConfig{}
 			if environment == "development" {
 				shardedTarget = dbConfig.Development
 			} else if environment == "acceptance" {
@@ -72,11 +59,11 @@ func GetDatabaseConfig(database string, environment string, shard string, user s
 				return target, errors.Errorf("Invalid target specified: " + environment)
 			}
 
-			shardConfig, err := reflections.GetField(shardedTarget, "Receptel")
-			if err != nil && shardConfig != nil {
-				return target, errors.Errorf("Invalid shard specified: " + shard + "\n\n" + err.Error())
+			shardConfig, keyFound := shardedTarget[shard]
+			if keyFound {
+				target = shardConfig
 			} else {
-				target = shardConfig.(TargetConfig)
+				return target, errors.Errorf("Invalid shard specified: " + shard)
 			}
 		} else {
 			dbConfig := DatabaseConfig{}
