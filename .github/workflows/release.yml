@@ -74,3 +74,14 @@ jobs:
         asset_path: dist/linux_amd64_voormedia-toolkit
         asset_name: linux_amd64_vmt
         asset_content_type: application/octet-stream
+
+  notify:
+    runs-on: ubuntu-latest #self-hosted
+    needs: [deploy]
+    if: ${{ always() }}
+    steps:
+      - name: Notify on Slack
+        uses: voormedia/ci-slack-notification@main
+        with:
+          token: ${{ secrets.GH_CLONE_TOKEN }}
+          slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
