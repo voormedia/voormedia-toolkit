@@ -12,6 +12,7 @@ var cmdBackup = &cobra.Command{
 	Short: "Creates a new backup of a Google Cloud SQL database and stores it in Backblaze B2.",
 
 	Run: func(cmd *cobra.Command, args []string) {
+		shard, _ := cmd.Flags().GetString("shard")
 		b2id, _ := cmd.Flags().GetString("b2id")
 		b2key, _ := cmd.Flags().GetString("b2key")
 		b2encrypt, _ := cmd.Flags().GetString("b2encrypt")
@@ -19,7 +20,7 @@ var cmdBackup = &cobra.Command{
 		port, _ := cmd.Flags().GetString("port")
 		host, _ := cmd.Flags().GetString("host")
 		configFile, _ := cmd.Flags().GetString("dbconfig")
-		if err := backup.Run(log, port, host, b2id, b2key, b2encrypt, b2bucket, configFile); err != nil {
+		if err := backup.Run(log, port, host, shard, b2id, b2key, b2encrypt, b2bucket, configFile); err != nil {
 			log.Fatal(err)
 		}
 	},
@@ -27,6 +28,7 @@ var cmdBackup = &cobra.Command{
 
 func init() {
 	cmdRoot.AddCommand(cmdBackup)
+	cmdBackup.Flags().String("shard", "", "Specifies the shard that should be backup up (when multiple shards exist)")
 	cmdBackup.Flags().String("b2id", os.Getenv("B2_ACCOUNT_ID"), "Specifies the Backblaze B2 account ID")
 	cmdBackup.Flags().String("b2key", os.Getenv("B2_ACCOUNT_KEY"), "Specifies the Backblaze B2 account key")
 	cmdBackup.Flags().String("b2encrypt", os.Getenv("B2_ENCRYPTION_KEY"), "Specifies the Backblaze B2 encryption key")

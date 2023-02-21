@@ -14,6 +14,7 @@ var cmdRestore = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		target, _ := cmd.Flags().GetString("target")
+		shard, _ := cmd.Flags().GetString("shard")
 		b2id, _ := cmd.Flags().GetString("b2id")
 		b2key, _ := cmd.Flags().GetString("b2key")
 		b2encrypt, _ := cmd.Flags().GetString("b2encrypt")
@@ -24,7 +25,7 @@ var cmdRestore = &cobra.Command{
 		targetUsername, _ := cmd.Flags().GetString("user")
 		targetPassword, _ := cmd.Flags().GetString("password")
 		targetDatabase, _ := cmd.Flags().GetString("database")
-		if err := restore.Run(log, target, b2id, b2key, b2encrypt, b2bucket, configFile, targetPort, targetHost, targetUsername, targetPassword, targetDatabase); err != nil {
+		if err := restore.Run(log, target, shard, b2id, b2key, b2encrypt, b2bucket, configFile, targetPort, targetHost, targetUsername, targetPassword, targetDatabase); err != nil {
 			log.Fatal(err)
 		}
 	},
@@ -33,6 +34,7 @@ var cmdRestore = &cobra.Command{
 func init() {
 	cmdRoot.AddCommand(cmdRestore)
 	cmdRestore.Flags().String("target", "development", "Specifies the target environment of the backup restore")
+	cmdRestore.Flags().String("shard", "", "Specifies the shard that should be restored to (when multiple shards exist)")
 	cmdRestore.Flags().String("b2id", os.Getenv("B2_ACCOUNT_ID"), "Specifies the Backblaze B2 account ID")
 	cmdRestore.Flags().String("b2key", os.Getenv("B2_ACCOUNT_KEY"), "Specifies the Backblaze B2 account key")
 	cmdRestore.Flags().String("b2encrypt", os.Getenv("B2_ENCRYPTION_KEY"), "Specifies the Backblaze B2 encryption key")

@@ -13,7 +13,7 @@ import (
 )
 
 // Run backup creation and stores it in Backblaze B2.
-func Run(log *util.Logger, port string, host string, b2id string, b2key string, b2encrypt string, b2bucketName string, configFile string) error {
+func Run(log *util.Logger, port string, host string, sourceShard string, b2id string, b2key string, b2encrypt string, b2bucketName string, configFile string) error {
 	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func Run(log *util.Logger, port string, host string, b2id string, b2key string, 
 		return err
 	}
 
-	target, err := util.GetDatabaseConfig(databaseSelection.Database, "custom", response.User, "", host, port, configFile)
+	target, err := util.GetDatabaseConfig(databaseSelection.Database, "custom", sourceShard, response.User, "", host, port, configFile)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func backupFromMySQL(target util.TargetConfig) (string, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n")
+		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
 	}
 
 	return fileName, nil
@@ -147,7 +147,7 @@ func backupFromPostgres(target util.TargetConfig) (string, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n")
+		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
 	}
 
 	return fileName, nil

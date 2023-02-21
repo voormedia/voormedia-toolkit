@@ -15,7 +15,7 @@ import (
 )
 
 // Run backup download (from Backblaze) and restore of a Google Cloud SQL database
-func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, b2encrypt string, b2bucketName string,
+func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id string, b2key string, b2encrypt string, b2bucketName string,
 	configFile string, targetPort string, targetHost string, targetUsername string, targetPassword string, targetDatabase string) error {
 
 	sqlInstances, err := util.FindSQLInstances()
@@ -89,7 +89,7 @@ func Run(log *util.Logger, targetEnvironment string, b2id string, b2key string, 
 		return err
 	}
 
-	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetUsername, targetPassword, targetHost, targetPort, configFile)
+	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetShard, targetUsername, targetPassword, targetHost, targetPort, configFile)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 		cmd.Env = append(cmd.Env, "PGPASSWORD="+target.Password)
 		err := cmd.Run()
 		if err != nil {
-			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n")
+			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
 		}
 	} else {
 		// Attempt to create the database in case it doesn't exist
@@ -195,7 +195,7 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 		cmd = exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
 		err := cmd.Run()
 		if err != nil {
-			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n")
+			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n\n" + err.Error())
 		}
 	}
 	return nil
