@@ -32,7 +32,7 @@ func init() {
 	cmdBackup.Flags().String("b2id", os.Getenv("B2_ACCOUNT_ID"), "Specifies the Backblaze B2 account ID")
 	cmdBackup.Flags().String("b2key", os.Getenv("B2_ACCOUNT_KEY"), "Specifies the Backblaze B2 account key")
 	cmdBackup.Flags().String("b2encrypt", os.Getenv("B2_ENCRYPTION_KEY"), "Specifies the Backblaze B2 encryption key")
-	cmdBackup.Flags().String("b2bucket", "voormedia-db-backups", "Specifies the Backblaze B2 backup bucket")
+	cmdBackup.Flags().String("b2bucket", "voormedia-eu-db-backups", "Specifies the Backblaze B2 backup bucket")
 	cmdBackup.Flags().String("port", "3307", "Specifies the port to use to reach the source database")
 	cmdBackup.Flags().String("host", "127.0.0.1", "Specifies the host to use to reach the source database.")
 	cmdBackup.Flags().String("dbconfig", "./config/database.yml", "Specifies the location of the application's database configuration file")
