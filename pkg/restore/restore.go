@@ -67,9 +67,18 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 		return err
 	}
 
-	sqlBackups, err := findSQLBackups(b2Context, databaseSelection.Database, b2Bucket)
+	sqlBackups, sqlDownloads, err := findSQLBackups(b2Context, databaseSelection.Database, b2Bucket)
 	if err != nil {
 		return err
+	}
+
+	var backupOptions []string
+	for i, backup := range sqlBackups {
+		displayText := backup
+		if sqlDownloads[i] {
+			displayText = "💾 " + backup
+		}
+		backupOptions = append(backupOptions, displayText)
 	}
 
 	q = []*survey.Question{
@@ -77,7 +86,7 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 			Name: "backup",
 			Prompt: &survey.Select{
 				Message: "Choose a backup to restore:",
-				Options: sqlBackups,
+				Options: backupOptions,
 			},
 		},
 	}
@@ -123,25 +132,36 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 	return nil
 }
 
-func findSQLBackups(ctx context.Context, database string, bucket *b2.Bucket) ([]string, error) {
+func findSQLBackups(ctx context.Context, database string, bucket *b2.Bucket) ([]string, []bool, error) {
 	var results []string
+	var downloaded []bool
 
 	backups := bucket.List(ctx, b2.ListPrefix(database))
 	for backups.Next() {
-		results = append(results, backups.Object().Name())
+		backupName := backups.Object().Name()
+		results = append(results, backupName)
+
+		// Determine if the file is already downloaded
+		splitFileName := strings.Split(backupName, "/")
+		file := strings.Replace("/tmp/"+splitFileName[len(splitFileName)-1], ".encrypted", "", 1)
+
+		_, err := os.Stat(file)
+		downloaded = append(downloaded, err == nil)
 	}
 
 	if len(results) == 0 {
-		return nil, errors.Errorf("Could not find any backups for the selected database")
+		return nil, nil, errors.Errorf("Could not find any backups for the selected database")
 	}
 
 	// Show the most recent backups at the top of the selection list
 	var reversedResults []string
+	var reversedDownloaded []bool
 	for i := len(results) - 1; i >= 0; i-- {
 		reversedResults = append(reversedResults, results[i])
+		reversedDownloaded = append(reversedDownloaded, downloaded[i])
 	}
 
-	return reversedResults, nil
+	return reversedResults, reversedDownloaded, nil
 }
 
 func downloadBackup(ctx context.Context, file string, bucket *b2.Bucket, encryptionKey string) (string, error) {
