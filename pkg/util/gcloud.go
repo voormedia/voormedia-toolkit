@@ -2,11 +2,26 @@ package util
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
+
+// Retrieve the current GCP project name
+func GetCurrentGCPProject() (string, error) {
+	cmd := exec.Command("gcloud", "config", "get-value", "project")
+	var out, errOut bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return "", errors.Errorf("Failed to get GCP project name: %s", errOut.String())
+	}
+
+	projectName := strings.TrimSpace(out.String())
+	return projectName, nil
+}
 
 // FindSQLInstances for Google Cloud
 func FindSQLInstances() ([]string, error) {

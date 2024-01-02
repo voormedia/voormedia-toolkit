@@ -3,13 +3,15 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/AlecAivazis/survey"
-	"github.com/kurin/blazer/b2"
-	"github.com/pkg/errors"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/AlecAivazis/survey"
+	"github.com/kurin/blazer/b2"
+	"github.com/pkg/errors"
 )
 
 // B2Bucket instance for Backblaze
@@ -119,4 +121,28 @@ func B2Setup(b2id string, b2key string, b2bucket string, b2encrypt string) (cont
 	}
 
 	return B2Bucket(credentials.B2id, credentials.B2key, credentials.B2bucket, credentials.B2encrypt, true)
+}
+
+// Returns the Backblaze B2 configuration for the current GCP project
+func GetB2Config() (string, string, string, string) {
+	gcloudProject, err := GetCurrentGCPProject()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var b2bucketName, b2encrypt, b2id, b2key string
+	switch gcloudProject {
+	case "taxology-381314":
+		b2bucketName = "taxology-eu-db-backups"
+		b2encrypt = os.Getenv("B2_TAXOLOGY_ENCRYPTION_KEY")
+		b2id = os.Getenv("B2_TAXOLOGY_ACCOUNT_ID")
+		b2key = os.Getenv("B2_TAXOLOGY_ACCOUNT_KEY")
+	default:
+		b2bucketName = "voormedia-eu-db-backups"
+		b2encrypt = os.Getenv("B2_ENCRYPTION_KEY")
+		b2id = os.Getenv("B2_ACCOUNT_ID")
+		b2key = os.Getenv("B2_ACCOUNT_KEY")
+	}
+
+	return b2bucketName, b2encrypt, b2id, b2key
 }

@@ -1,10 +1,9 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/voormedia/voormedia-toolkit/pkg/restore"
+	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
 var cmdRestore = &cobra.Command{
@@ -32,13 +31,15 @@ var cmdRestore = &cobra.Command{
 }
 
 func init() {
+	b2bucketName, b2encrypt, b2id, b2key := util.GetB2Config()
+
 	cmdRoot.AddCommand(cmdRestore)
 	cmdRestore.Flags().String("target", "development", "Specifies the target environment of the backup restore")
 	cmdRestore.Flags().String("shard", "", "Specifies the shard that should be restored to (when multiple shards exist)")
-	cmdRestore.Flags().String("b2id", os.Getenv("B2_ACCOUNT_ID"), "Specifies the Backblaze B2 account ID")
-	cmdRestore.Flags().String("b2key", os.Getenv("B2_ACCOUNT_KEY"), "Specifies the Backblaze B2 account key")
-	cmdRestore.Flags().String("b2encrypt", os.Getenv("B2_ENCRYPTION_KEY"), "Specifies the Backblaze B2 encryption key")
-	cmdRestore.Flags().String("b2bucket", "voormedia-eu-db-backups", "Specifies the Backblaze B2 backup bucket")
+	cmdRestore.Flags().String("b2id", b2id, "Specifies the Backblaze B2 account ID")
+	cmdRestore.Flags().String("b2key", b2key, "Specifies the Backblaze B2 account key")
+	cmdRestore.Flags().String("b2encrypt", b2encrypt, "Specifies the Backblaze B2 encryption key")
+	cmdRestore.Flags().String("b2bucket", b2bucketName, "Specifies the Backblaze B2 backup bucket")
 	cmdRestore.Flags().String("dbconfig", "./config/database.yml", "Specifies the location of the application's database configuration file")
 	cmdRestore.Flags().String("port", "3306", "Specifies the port to use when restoring the target database")
 	cmdRestore.Flags().String("host", "127.0.0.1", "Specifies the host to use when restoring the target database.")
