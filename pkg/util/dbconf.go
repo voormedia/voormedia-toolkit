@@ -11,6 +11,7 @@ import (
 type TargetConfig struct {
 	Hostname    string
 	Port        string
+	Adapter     string
 	Database    string
 	Username    string
 	Password    string
@@ -90,8 +91,34 @@ func GetDatabaseConfig(database string, environment string, shard string, user s
 	}
 
 	target.Hostname = host
-	target.Port = port
 	target.Environment = environment
+
+	if port == "" {
+		switch target.Adapter {
+		case "mysql2":
+			{
+				target.Port = "3306"
+			}
+		case "postgresql":
+			{
+				target.Port = "5432"
+			}
+		case "sqlserver":
+			{
+				target.Port = "1433"
+			}
+		case "oracle_enhanced":
+			{
+				target.Port = "1521"
+			}
+		default:
+			{
+				target.Port = "3306"
+			}
+		}
+	} else {
+		target.Port = port
+	}
 
 	if target.Database == "" {
 		return target, errors.Errorf("Could not find a database belonging to the target")
