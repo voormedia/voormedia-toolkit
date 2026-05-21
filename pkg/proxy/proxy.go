@@ -1,21 +1,33 @@
 package proxy
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/AlecAivazis/survey"
+	"github.com/charmbracelet/lipgloss"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
+var (
+	readyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	hintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+)
+
 // Run Google Cloud SQL proxy container
 func Run(log *util.Logger, port string) error {
+	if project, err := util.GetCurrentGCPProject(); err == nil && project != "" {
+		fmt.Println(util.GCPBanner(project))
+	}
+
 	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err
@@ -54,10 +66,44 @@ func Run(log *util.Logger, port string) error {
 
 	cmd := exec.Command(proxyFile, args...)
 	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	cmd.Run()
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		scanProxyStderr(stderrPipe, port)
+	}()
+
+	<-done
+	cmd.Wait()
 	return nil
+}
+
+func scanProxyStderr(r io.Reader, port string) {
+	scanner := bufio.NewScanner(r)
+	ready := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !ready && strings.Contains(line, "Ready for new connections") {
+			ready = true
+			fmt.Fprintf(os.Stderr, "%s Cloud SQL proxy listening on localhost:%s %s\n",
+				readyStyle.Render("✓"),
+				port,
+				hintStyle.Render("(Ctrl+C to stop)"),
+			)
+			continue
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
 }
 
 func findProxyFile() (string, error) {
@@ -79,7 +125,6 @@ func findProxyFile() (string, error) {
 		}
 	}
 
-	fmt.Printf("Starting Google Cloud SQL proxy...\n")
 	return proxyFile, nil
 }
 

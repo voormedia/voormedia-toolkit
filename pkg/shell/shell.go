@@ -11,6 +11,10 @@ import (
 
 // Run a shell of a Google Cloud SQL database of choice.
 func Run(log *util.Logger) error {
+	if project, err := util.GetCurrentGCPProject(); err == nil && project != "" {
+		fmt.Println(util.GCPBanner(project))
+	}
+
 	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey"
@@ -14,9 +15,26 @@ import (
 	"github.com/voormedia/voormedia-toolkit/pkg/util"
 )
 
+var backupNameRe = regexp.MustCompile(`(\d{4}-\d{2}-\d{2})_(\d{2}:\d{2}:\d{2})`)
+
+func formatBackupOption(name string, downloaded bool) string {
+	text := name
+	if m := backupNameRe.FindStringSubmatch(name); len(m) == 3 {
+		text = m[1] + "  " + m[2]
+	}
+	if downloaded {
+		return text + "  💾"
+	}
+	return text
+}
+
 // Run backup download (from Backblaze) and restore of a Google Cloud SQL database
 func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id string, b2key string, b2encrypt string, b2bucketName string,
 	configFile string, targetPort string, targetHost string, targetUsername string, targetPassword string, targetDatabase string) error {
+
+	if project, err := util.GetCurrentGCPProject(); err == nil && project != "" {
+		fmt.Println(util.GCPBanner(project))
+	}
 
 	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
@@ -73,12 +91,11 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 	}
 
 	var backupOptions []string
+	displayToBackup := map[string]string{}
 	for i, backup := range sqlBackups {
-		displayText := backup
-		if sqlDownloads[i] {
-			displayText = "💾 " + backup
-		}
-		backupOptions = append(backupOptions, displayText)
+		display := formatBackupOption(backup, sqlDownloads[i])
+		backupOptions = append(backupOptions, display)
+		displayToBackup[display] = backup
 	}
 
 	q = []*survey.Question{
@@ -98,7 +115,7 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 		return err
 	}
 
-	selectedBackup := strings.TrimPrefix(backupSelection.Backup, "💾 ")
+	selectedBackup := displayToBackup[backupSelection.Backup]
 
 	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetShard, targetUsername, targetPassword, targetHost, targetPort, configFile)
 	if err != nil {
@@ -108,13 +125,25 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 	splitFileName := strings.Split(selectedBackup, "/")
 	encryptedPath := "/tmp/" + splitFileName[len(splitFileName)-1]
 	decryptedPath := strings.Replace(encryptedPath, ".encrypted", "", 1)
+	elevated := target.Environment == "acceptance" || target.Environment == "production"
 
-	header := fmt.Sprintf("Downloading Backblaze backup to restore it on the %s environment", target.Environment)
+	fmt.Println()
+	header := "Downloading Backblaze backup"
+	if elevated {
+		header = fmt.Sprintf("Downloading Backblaze backup to restore it on the %s environment", util.EnvRed(target.Environment))
+	}
 	_, downloaded, err := util.B2Download(b2Context, b2Bucket, selectedBackup, header)
 	if err != nil {
 		return err
 	}
 
+	if !downloaded && elevated {
+		fmt.Printf("Restoring on the %s environment\n", util.EnvRed(target.Environment))
+	}
+
+	// Re-decrypt whenever we just downloaded (any cached decrypted file is
+	// now stale relative to the fresh encrypted file), or when no decrypted
+	// file exists yet.
 	if downloaded {
 		os.Remove(decryptedPath)
 	}
@@ -124,12 +153,16 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 		}
 	}
 
+	file := decryptedPath
+
 	if strings.Contains(instanceSelection.Instance, "mysql") {
-		if err := restoreBackupToMySQL(target, decryptedPath); err != nil {
+		err = restoreBackupToMySQL(target, file)
+		if err != nil {
 			return err
 		}
 	} else {
-		if err := restoreBackupToPostgres(target, decryptedPath); err != nil {
+		err = restoreBackupToPostgres(target, file)
+		if err != nil {
 			return err
 		}
 	}
@@ -170,30 +203,31 @@ func findSQLBackups(ctx context.Context, database string, bucket *b2.Bucket) ([]
 }
 
 func restoreBackupToMySQL(target util.TargetConfig, backup string) error {
-	fmt.Printf("Restoring to MySQL database %s (%s:%s)...\n", target.Database, target.Hostname, target.Port)
-
 	// Attempt to create the database in case it doesn't exist
-	cmd := exec.Command("mysqladmin", "-u", target.Username, "-h", target.Hostname, "create", target.Database, "&>", "/dev/null")
-	cmd.Run()
+	createCmd := exec.Command("mysqladmin", "-u", target.Username, "-h", target.Hostname, "create", target.Database, "&>", "/dev/null")
+	createCmd.Run()
 
-	cmd = exec.Command("mysql", "-u", target.Username, "-h", target.Hostname, "--password="+target.Password, "-P", target.Port, target.Database, "-e", "source "+backup)
+	sp := util.StartSpinner(fmt.Sprintf("Restoring MySQL %s (%s:%s)", target.Database, target.Hostname, target.Port))
+	cmd := exec.Command("mysql", "-u", target.Username, "-h", target.Hostname, "--password="+target.Password, "-P", target.Port, target.Database, "-e", "source "+backup)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
+		sp.StopFail()
 		if target.Environment != "development" {
 			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, stderr.String())
 		}
 		return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port %s\n\n%s", target.Port, stderr.String())
 	}
+	sp.Stop()
 
 	return nil
 }
 
 func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
-	fmt.Printf("Restoring to Postgres database %s (%s:%s)...\n", target.Database, target.Hostname, target.Port)
+	sp := util.StartSpinner(fmt.Sprintf("Restoring Postgres %s (%s:%s)", target.Database, target.Hostname, target.Port))
 
 	if target.Environment != "development" {
 		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-U", target.Username, "-f", backup)
@@ -201,6 +235,7 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 		cmd.Env = append(cmd.Env, "PGPASSWORD="+target.Password)
 		err := cmd.Run()
 		if err != nil {
+			sp.StopFail()
 			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, err.Error())
 		}
 	} else {
@@ -211,8 +246,10 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
 		err := cmd.Run()
 		if err != nil {
+			sp.StopFail()
 			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port %s\n\n%s", target.Port, err.Error())
 		}
 	}
+	sp.Stop()
 	return nil
 }

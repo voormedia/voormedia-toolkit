@@ -14,6 +14,10 @@ import (
 
 // Run backup creation and stores it in Backblaze B2.
 func Run(log *util.Logger, port string, host string, sourceShard string, b2id string, b2key string, b2encrypt string, b2bucketName string, configFile string) error {
+	if project, err := util.GetCurrentGCPProject(); err == nil && project != "" {
+		fmt.Println(util.GCPBanner(project))
+	}
+
 	sqlInstances, err := util.FindSQLInstances()
 	if err != nil {
 		return err
@@ -96,8 +100,13 @@ func Run(log *util.Logger, port string, host string, sourceShard string, b2id st
 		}
 	}
 
+	sp := util.StartSpinner("Encrypting backup")
 	cmd := exec.Command("openssl", "aes-256-cbc", "-md", "md5", "-in", "/tmp/"+file, "-out", "/tmp/"+file+".encrypted", "-pass", "pass:"+b2encrypt)
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		sp.StopFail()
+		return err
+	}
+	sp.Stop()
 
 	err = util.B2Upload(b2Context, b2Bucket, databaseSelection.Database, file+".encrypted")
 	if err != nil {
