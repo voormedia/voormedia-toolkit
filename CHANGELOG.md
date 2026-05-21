@@ -1,3 +1,10 @@
+# v2.0.0
+
+* **Coordinated visual refresh across every interactive command.** Backups, restores, the proxy, and the shell now share a consistent look: the active GCP project is shown as a banner at the top, prompts and selections use a blue accent instead of survey's default cyan, and progress bars and spinners get a styled, full-terminal-width layout.
+* **The restore command makes acceptance and production targets impossible to miss.** Those environment names render in bold red on the download header and on the cached-backup banner, so there's no quiet "development" default that slips past before you press Enter.
+* **The backup picker is human-readable.** The list now shows `2026-05-19  04:00:09  💾` instead of the raw encrypted filename; the 💾 on the right means a cached copy is on disk and will be reused without re-downloading.
+* **The Cloud SQL proxy tells you when it's actually ready.** Instead of leaving you to scan `cloud_sql_proxy`'s startup logs for "Ready for new connections," `vmt proxy` now prints `✓ Cloud SQL proxy listening on localhost:3307 (Ctrl+C to stop)` once the proxy is accepting connections. Connection logs and errors still pass through.
+
 # v1.5.0
 
 * **Backup downloads recover from interruptions and corruption automatically.** If a previous `vmt restore` was cancelled mid-download, the next run no longer fails with a confusing "decryption error" — it now detects the size mismatch against Backblaze, wipes the partial file, and re-downloads cleanly. Downloads also write to a `.partial` file and rename on success, so an interrupted transfer never leaves behind a file that looks complete.
