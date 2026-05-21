@@ -1,3 +1,7 @@
+# v1.4.3
+
+* Download the Cloud SQL proxy binary matching the host architecture, so Apple Silicon and Linux arm64 machines no longer fetch the Intel build.
+
 # v1.3.0
 
 * Add the option to specify a shard when interpreting Rails database configuration files.
