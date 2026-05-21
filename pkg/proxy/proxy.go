@@ -67,11 +67,15 @@ func findProxyFile() (string, error) {
 
 	if _, err := os.Stat(proxyFile); os.IsNotExist(err) {
 		fmt.Printf("Proxy file not found in the home directory. Downloading it now.\n")
-		cmd := exec.Command("")
-		if runtime.GOOS == "linux" {
-			cmd = exec.Command("wget", "https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64", "-O", proxyFile)
-		} else if runtime.GOOS == "darwin" {
-			cmd = exec.Command("curl", "-o", proxyFile, "https://dl.google.com/cloudsql/cloud_sql_proxy.darwin.amd64")
+		url := fmt.Sprintf("https://dl.google.com/cloudsql/cloud_sql_proxy.%s.%s", runtime.GOOS, runtime.GOARCH)
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "linux":
+			cmd = exec.Command("wget", url, "-O", proxyFile)
+		case "darwin":
+			cmd = exec.Command("curl", "-o", proxyFile, url)
+		default:
+			return "", errors.Errorf("Unsupported OS: %s", runtime.GOOS)
 		}
 
 		var out, errOut bytes.Buffer
