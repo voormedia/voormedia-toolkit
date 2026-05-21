@@ -1,8 +1,9 @@
 package proxy
 
 import (
-	"bytes"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -66,32 +67,43 @@ func findProxyFile() (string, error) {
 	}
 
 	if _, err := os.Stat(proxyFile); os.IsNotExist(err) {
-		fmt.Printf("Proxy file not found in the home directory. Downloading it now.\n")
-		url := fmt.Sprintf("https://dl.google.com/cloudsql/cloud_sql_proxy.%s.%s", runtime.GOOS, runtime.GOARCH)
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "linux":
-			cmd = exec.Command("wget", url, "-O", proxyFile)
-		case "darwin":
-			cmd = exec.Command("curl", "-o", proxyFile, url)
-		default:
+		if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 			return "", errors.Errorf("Unsupported OS: %s", runtime.GOOS)
 		}
-
-		var out, errOut bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &errOut
-		if err := cmd.Run(); err != nil {
-			return "", errors.Errorf("Failed to download proxy file: %s", errOut.String())
+		url := fmt.Sprintf("https://dl.google.com/cloudsql/cloud_sql_proxy.%s.%s", runtime.GOOS, runtime.GOARCH)
+		if err := downloadProxy(url, proxyFile); err != nil {
+			return "", errors.Errorf("Failed to download proxy file: %s", err.Error())
 		}
-
-		fmt.Printf("Downloaded the proxy file. Making it executable now.\n")
-		cmd = exec.Command("chmod", "+x", proxyFile)
-		if err := cmd.Run(); err != nil {
-			return "", errors.Errorf("Failed to make the proxy file executable: %s", errOut.String())
+		if err := os.Chmod(proxyFile, 0755); err != nil {
+			return "", errors.Errorf("Failed to make proxy file executable: %s", err.Error())
 		}
 	}
 
 	fmt.Printf("Starting Google Cloud SQL proxy...\n")
 	return proxyFile, nil
+}
+
+func downloadProxy(url, dest string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("Unexpected response: %s", resp.Status)
+	}
+
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	pw := util.NewProgressWriter(f, "", resp.ContentLength).SetHeader("Downloading Cloud SQL proxy")
+	if _, err := io.Copy(pw, resp.Body); err != nil {
+		pw.FinishFail()
+		return err
+	}
+	pw.Finish()
+	return nil
 }

@@ -98,33 +98,38 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 		return err
 	}
 
+	selectedBackup := strings.TrimPrefix(backupSelection.Backup, "💾 ")
+
 	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetShard, targetUsername, targetPassword, targetHost, targetPort, configFile)
 	if err != nil {
 		return err
 	}
 
-	file := ""
-	splitFileName := strings.Split(backupSelection.Backup, "/")
-	if _, err := os.Stat("/tmp/" + splitFileName[len(splitFileName)-1]); err == nil {
-		fmt.Printf("Selected Backblaze backup has already been downloaded. Using file on disk to restore on the " + target.Environment + " environment...\n")
-	} else {
-		fmt.Printf("Downloading Backblaze backup to restore it on the " + target.Environment + " environment...\n")
-		file, err = downloadBackup(b2Context, backupSelection.Backup, b2Bucket, b2encrypt)
-		if err != nil {
+	splitFileName := strings.Split(selectedBackup, "/")
+	encryptedPath := "/tmp/" + splitFileName[len(splitFileName)-1]
+	decryptedPath := strings.Replace(encryptedPath, ".encrypted", "", 1)
+
+	header := fmt.Sprintf("Downloading Backblaze backup to restore it on the %s environment", target.Environment)
+	_, downloaded, err := util.B2Download(b2Context, b2Bucket, selectedBackup, header)
+	if err != nil {
+		return err
+	}
+
+	if downloaded {
+		os.Remove(decryptedPath)
+	}
+	if _, err := os.Stat(decryptedPath); err != nil {
+		if err := util.DecryptBackup(encryptedPath, decryptedPath, b2encrypt); err != nil {
 			return err
 		}
 	}
 
-	file = strings.Replace("/tmp/"+splitFileName[len(splitFileName)-1], ".encrypted", "", 1)
-
 	if strings.Contains(instanceSelection.Instance, "mysql") {
-		err = restoreBackupToMySQL(target, file)
-		if err != nil {
+		if err := restoreBackupToMySQL(target, decryptedPath); err != nil {
 			return err
 		}
 	} else {
-		err = restoreBackupToPostgres(target, file)
-		if err != nil {
+		if err := restoreBackupToPostgres(target, decryptedPath); err != nil {
 			return err
 		}
 	}
@@ -164,17 +169,8 @@ func findSQLBackups(ctx context.Context, database string, bucket *b2.Bucket) ([]
 	return reversedResults, reversedDownloaded, nil
 }
 
-func downloadBackup(ctx context.Context, file string, bucket *b2.Bucket, encryptionKey string) (string, error) {
-	localFile, err := util.B2Object(ctx, bucket, file, encryptionKey)
-	if err != nil {
-		return "", err
-	}
-
-	return localFile, nil
-}
-
 func restoreBackupToMySQL(target util.TargetConfig, backup string) error {
-	fmt.Printf("Restoring to MySQL database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n")
+	fmt.Printf("Restoring to MySQL database %s (%s:%s)...\n", target.Database, target.Hostname, target.Port)
 
 	// Attempt to create the database in case it doesn't exist
 	cmd := exec.Command("mysqladmin", "-u", target.Username, "-h", target.Hostname, "create", target.Database, "&>", "/dev/null")
@@ -188,16 +184,16 @@ func restoreBackupToMySQL(target util.TargetConfig, backup string) error {
 	err := cmd.Run()
 	if err != nil {
 		if target.Environment != "development" {
-			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + stderr.String())
+			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, stderr.String())
 		}
-		return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n\n" + stderr.String())
+		return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port %s\n\n%s", target.Port, stderr.String())
 	}
 
 	return nil
 }
 
 func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
-	fmt.Printf("Restoring to Postgres database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n")
+	fmt.Printf("Restoring to Postgres database %s (%s:%s)...\n", target.Database, target.Hostname, target.Port)
 
 	if target.Environment != "development" {
 		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-U", target.Username, "-f", backup)
@@ -205,17 +201,17 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 		cmd.Env = append(cmd.Env, "PGPASSWORD="+target.Password)
 		err := cmd.Run()
 		if err != nil {
-			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
+			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, err.Error())
 		}
 	} else {
 		// Attempt to create the database in case it doesn't exist
-		cmd := exec.Command("createdb", target.Database, "-h", target.Hostname, "-p", target.Port)
-		cmd.Run()
+		createCmd := exec.Command("createdb", target.Database, "-h", target.Hostname, "-p", target.Port)
+		createCmd.Run()
 
-		cmd = exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
+		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
 		err := cmd.Run()
 		if err != nil {
-			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port " + target.Port + "\n\n" + err.Error())
+			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port %s\n\n%s", target.Port, err.Error())
 		}
 	}
 	return nil

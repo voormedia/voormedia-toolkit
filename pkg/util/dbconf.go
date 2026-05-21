@@ -57,14 +57,14 @@ func GetDatabaseConfig(database string, environment string, shard string, user s
 			} else if environment == "production" {
 				shardedTarget = dbConfig.Production
 			} else {
-				return target, errors.Errorf("Invalid target specified: " + environment)
+				return target, errors.Errorf("Invalid target specified: %s", environment)
 			}
 
 			shardConfig, keyFound := shardedTarget[shard]
 			if keyFound {
 				target = shardConfig
 			} else {
-				return target, errors.Errorf("Invalid shard specified: " + shard)
+				return target, errors.Errorf("Invalid shard specified: %s", shard)
 			}
 		} else {
 			dbConfig := DatabaseConfig{}
@@ -80,7 +80,7 @@ func GetDatabaseConfig(database string, environment string, shard string, user s
 			} else if environment == "production" {
 				target = dbConfig.Production
 			} else {
-				return target, errors.Errorf("Invalid target specified: " + environment)
+				return target, errors.Errorf("Invalid target specified: %s", environment)
 			}
 		}
 	} else {

@@ -41,46 +41,108 @@ func B2Bucket(b2id string, b2key string, b2bucket string, b2encrypt string, manu
 
 // B2Upload an object to Backblaze
 func B2Upload(ctx context.Context, bucket *b2.Bucket, database string, fileName string) error {
-	fmt.Printf("Uploading backup to Backblaze B2...\n")
 	file, err := os.Open("/tmp/" + fileName)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
 	object := bucket.Object(database + "/" + fileName)
 	w := object.NewWriter(ctx)
-	if _, err := io.Copy(w, file); err != nil {
+	pw := NewProgressWriter(w, "Uploading", info.Size())
+	if _, err := io.Copy(pw, file); err != nil {
+		pw.FinishFail()
 		w.Close()
 		return err
 	}
+	pw.Finish()
 	w.Close()
 	return nil
 }
 
-// B2Object download and decrypt an object from Backblaze
-func B2Object(ctx context.Context, bucket *b2.Bucket, fileName string, encryptionKey string) (string, error) {
+// B2Download ensures /tmp/<filename> contains the named Backblaze object.
+// It compares the local file's size against the remote object's size; if
+// they match the local copy is treated as valid cache and no transfer
+// happens. Otherwise (file missing, partial, or corrupt) the file is
+// re-downloaded — written first to a .partial path and renamed on
+// success, so an interrupted transfer never leaves a "looks complete"
+// file behind. The returned bool reports whether bytes were actually
+// transferred. If header is non-empty, it is rendered as the bar's
+// header line with the percentage right-anchored alongside it.
+func B2Download(ctx context.Context, bucket *b2.Bucket, fileName, header string) (string, bool, error) {
 	splitFileName := strings.Split(fileName, "/")
 	target := "/tmp/" + splitFileName[len(splitFileName)-1]
-	r := bucket.Object(fileName).NewReader(ctx)
+	partial := target + ".partial"
+
+	obj := bucket.Object(fileName)
+	attrs, err := obj.Attrs(ctx)
+	if err != nil {
+		return "", false, err
+	}
+
+	if info, err := os.Stat(target); err == nil && info.Size() == attrs.Size {
+		return target, false, nil
+	}
+
+	// Either missing or wrong size — wipe any stale copies and re-download.
+	os.Remove(target)
+	os.Remove(partial)
+
+	r := obj.NewReader(ctx)
 	defer r.Close()
 
-	f, err := os.Create(target)
+	f, err := os.Create(partial)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	r.ConcurrentDownloads = 1
-	if _, err := io.Copy(f, r); err != nil {
+	pw := NewProgressWriter(f, "", attrs.Size).SetHeader(header)
+	if _, err := io.Copy(pw, r); err != nil {
+		pw.FinishFail()
 		f.Close()
-		return "", err
+		os.Remove(partial)
+		return "", false, err
+	}
+	pw.Finish()
+	f.Close()
+
+	if err := os.Rename(partial, target); err != nil {
+		os.Remove(partial)
+		return "", false, err
 	}
 
-	f.Close()
-	cmd := exec.Command("openssl", "aes-256-cbc", "-md", "md5", "-d", "-in", target, "-out", strings.Replace(target, ".encrypted", "", 1), "-pass", "pass:"+encryptionKey)
-	cmd.Run()
+	return target, true, nil
+}
 
-	return target, nil
+// DecryptBackup decrypts an AES-256-CBC encrypted backup file to dst,
+// showing a spinner while openssl runs. The destination is written
+// atomically (to a .partial file first, renamed on success) for the same
+// reason as B2Download.
+func DecryptBackup(src, dst, key string) error {
+	partial := dst + ".partial"
+	os.Remove(partial)
+
+	sp := StartSpinner("Decrypting backup")
+	cmd := exec.Command("openssl", "aes-256-cbc", "-md", "md5", "-d", "-in", src, "-out", partial, "-pass", "pass:"+key)
+	if err := cmd.Run(); err != nil {
+		sp.StopFail()
+		os.Remove(partial)
+		return err
+	}
+
+	if err := os.Rename(partial, dst); err != nil {
+		sp.StopFail()
+		os.Remove(partial)
+		return err
+	}
+	sp.Stop()
+	return nil
 }
 
 // B2Setup credentials for Backblaze manually

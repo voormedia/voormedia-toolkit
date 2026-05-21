@@ -108,8 +108,8 @@ func Run(log *util.Logger, port string, host string, sourceShard string, b2id st
 }
 
 func backupFromMySQL(target util.TargetConfig) (string, error) {
-	fmt.Printf("Backing up MySQL database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n" +
-		"You may have to enter a password for user " + target.Username + "\n")
+	fmt.Printf("Backing up MySQL database %s (%s:%s)...\nYou may have to enter a password for user %s\n",
+		target.Database, target.Hostname, target.Port, target.Username)
 
 	fileName := target.Database + "_" + time.Now().Format("2006-01-02_15:04:05") + ".sql"
 
@@ -124,15 +124,15 @@ func backupFromMySQL(target util.TargetConfig) (string, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
+		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, err.Error())
 	}
 
 	return fileName, nil
 }
 
 func backupFromPostgres(target util.TargetConfig) (string, error) {
-	fmt.Printf("Backing up Postgres database " + target.Database + " (" + target.Hostname + ":" + target.Port + ")...\n" +
-		"You may have to enter a password for user " + target.Username + "\n")
+	fmt.Printf("Backing up Postgres database %s (%s:%s)...\nYou may have to enter a password for user %s\n",
+		target.Database, target.Hostname, target.Port, target.Username)
 
 	fileName := target.Database + "_" + time.Now().Format("2006-01-02_15:04:05") + ".sql"
 
@@ -147,7 +147,7 @@ func backupFromPostgres(target util.TargetConfig) (string, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port " + target.Port + "\n\n" + err.Error())
+		return "", errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, err.Error())
 	}
 
 	return fileName, nil
