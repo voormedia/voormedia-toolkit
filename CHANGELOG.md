@@ -1,3 +1,7 @@
+# v2.0.1
+
+* **CI release pipeline now produces downloadable binaries again.** The previous releases (v1.4.3, v1.5.0, v2.0.0) had their tags pushed but the release workflow failed before it could attach any artifacts, so their GitHub release pages are empty. This release is functionally identical to v2.0.0 — install it to get the v2.0.0 features with working install scripts.
+
 # v2.0.0
 
 * **Coordinated visual refresh across every interactive command.** Backups, restores, the proxy, and the shell now share a consistent look: the active GCP project is shown as a banner at the top, prompts and selections use a blue accent instead of survey's default cyan, and progress bars and spinners get a styled, full-terminal-width layout.
