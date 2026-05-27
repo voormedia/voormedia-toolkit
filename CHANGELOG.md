@@ -1,3 +1,7 @@
+# v2.1.0
+
+* **`vmt restore` now reads Rails `database.yml` files that use ERB.** Database names written as `<%= ENV.fetch("PGDATABASE") { "myapp-dev" } %>` previously caused a confusing "Couldn't connect to the target database" failure, because vmt fed the raw template text to Postgres as the database name. vmt now renders the env-reading expressions these files use — `<%= ENV["X"] %>`, `<%= ENV.fetch("X") { "default" } %>`, `<%= ENV.fetch("X", "default") %>`, and the `<%= ENV["X"] || "default" %>` fallback form — honouring environment variables and their defaults exactly as Rails does, before parsing the YAML. Any output tag it can't evaluate (e.g. `<%= Rails.application.credentials… %>`) is left untouched and reported with a warning, so an unsupported construct surfaces clearly instead of as a cryptic connection error. Config files without ERB (non-Ruby projects) are unaffected, and there's no new runtime dependency. Pass `--database` to override the file as before.
+
 # v2.0.1
 
 * **CI release pipeline now produces downloadable binaries again.** The previous releases (v1.4.3, v1.5.0, v2.0.0) had their tags pushed but the release workflow failed before it could attach any artifacts, so their GitHub release pages are empty. This release is functionally identical to v2.0.0 — install it to get the v2.0.0 features with working install scripts.

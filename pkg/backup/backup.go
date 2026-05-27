@@ -82,7 +82,7 @@ func Run(log *util.Logger, port string, host string, sourceShard string, b2id st
 		return err
 	}
 
-	target, err := util.GetDatabaseConfig(databaseSelection.Database, "custom", sourceShard, response.User, "", host, port, configFile)
+	target, err := util.GetDatabaseConfig(log, databaseSelection.Database, "custom", sourceShard, response.User, "", host, port, configFile)
 	if err != nil {
 		return err
 	}
