@@ -117,7 +117,7 @@ func Run(log *util.Logger, targetEnvironment string, targetShard string, b2id st
 
 	selectedBackup := displayToBackup[backupSelection.Backup]
 
-	target, err := util.GetDatabaseConfig(targetDatabase, targetEnvironment, targetShard, targetUsername, targetPassword, targetHost, targetPort, configFile)
+	target, err := util.GetDatabaseConfig(log, targetDatabase, targetEnvironment, targetShard, targetUsername, targetPassword, targetHost, targetPort, configFile)
 	if err != nil {
 		return err
 	}
