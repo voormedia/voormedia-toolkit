@@ -230,24 +230,36 @@ func restoreBackupToPostgres(target util.TargetConfig, backup string) error {
 	sp := util.StartSpinner(fmt.Sprintf("Restoring Postgres %s (%s:%s)", target.Database, target.Hostname, target.Port))
 
 	if target.Environment != "development" {
-		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-U", target.Username, "-f", backup)
+		cmd := exec.Command("psql", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-U", target.Username, "-f", backup)
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "PGPASSWORD="+target.Password)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
 		err := cmd.Run()
 		if err != nil {
 			sp.StopFail()
-			return errors.Errorf("Couldn't connect to the target database. Please check that the proxy is running on port %s\n\n%s", target.Port, err.Error())
+			detail := strings.TrimSpace(stderr.String())
+			if detail == "" {
+				detail = err.Error()
+			}
+			return errors.Errorf("Restore failed. Check that the proxy is running on port %s and that the dump is compatible with the target schema.\n\n%s", target.Port, detail)
 		}
 	} else {
 		// Attempt to create the database in case it doesn't exist
 		createCmd := exec.Command("createdb", target.Database, "-h", target.Hostname, "-p", target.Port)
 		createCmd.Run()
 
-		cmd := exec.Command("psql", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
+		cmd := exec.Command("psql", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-d", target.Database, "-h", target.Hostname, "-p", target.Port, "-f", backup)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
 		err := cmd.Run()
 		if err != nil {
 			sp.StopFail()
-			return errors.Errorf("Couldn't connect to the target database. Please check that your database server running on port %s\n\n%s", target.Port, err.Error())
+			detail := strings.TrimSpace(stderr.String())
+			if detail == "" {
+				detail = err.Error()
+			}
+			return errors.Errorf("Restore failed. Check that your database server is running on port %s and that the dump is compatible with the target schema.\n\n%s", target.Port, detail)
 		}
 	}
 	sp.Stop()
