@@ -29,8 +29,10 @@ var erbOtherRe = regexp.MustCompile(`(?s)<%[^=].*?%>|<%%>`)
 var envFetchRe = regexp.MustCompile(`^ENV\.fetch\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?)\s*)?\)\s*(?:\{\s*(.+?)\s*\})?$`)
 
 // envIndexRe matches `ENV["NAME"]`, optionally with a `|| "default"` fallback —
-// `<%= ENV["DB_HOST"] || "localhost" %>` is as common as the fetch form.
-var envIndexRe = regexp.MustCompile(`^ENV\[\s*['"]([^'"]+)['"]\s*\]\s*(?:\|\|\s*(.+?)\s*)?$`)
+// `<%= ENV["DB_HOST"] || "localhost" %>` is as common as the fetch form. The
+// `||=` assign-default form (`<%= ENV["DB_ADAPTER"] ||= "postgresql" %>`) renders
+// to the same value, so it is accepted too.
+var envIndexRe = regexp.MustCompile(`^ENV\[\s*['"]([^'"]+)['"]\s*\]\s*(?:\|\|=?\s*(.+?)\s*)?$`)
 
 // renderERB evaluates the ENV-reading ERB expressions in a database.yml file and
 // returns the rendered YAML alongside any output tags it could not evaluate. An

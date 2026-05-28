@@ -27,6 +27,8 @@ func TestRenderERB(t *testing.T) {
 		{"index with || fallback, env set", `<%= ENV["PGHOST"] || "localhost" %>`, "db.internal"},
 		{"index with || fallback, env unset", `<%= ENV["MISSING"] || "localhost" %>`, "localhost"},
 		{"index with || fallback, single quotes", `<%= ENV['MISSING'] || 'fallback' %>`, "fallback"},
+		{"index with ||= fallback, env set", `<%= ENV["PGHOST"] ||= "localhost" %>`, "db.internal"},
+		{"index with ||= fallback, env unset", `<%= ENV['DB_ADAPTER'] ||= 'postgresql' %>`, "postgresql"},
 		{"single quotes", `<%= ENV.fetch('PGHOST') { 'x' } %>`, "db.internal"},
 		{"trim markers", `<%=- ENV.fetch("PGHOST") { "x" } -%>`, "db.internal"},
 		{"comment tag stripped", `before<%# secret %>after`, "beforeafter"},
