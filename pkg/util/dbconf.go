@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -43,9 +44,8 @@ func GetDatabaseConfig(log *Logger, database string, environment string, shard s
 			return target, err
 		}
 
-		// database.yml is an ERB template in Rails projects; render it so values
-		// like `<%= ENV.fetch("PGDATABASE") { "myapp-dev" } %>` resolve before parsing.
-		renderedStr, unresolved := renderERB(string(yamlFile))
+		rootDir := filepath.Dir(filepath.Dir(configFile))
+		renderedStr, unresolved := renderERB(string(yamlFile), rootDir)
 		rendered := []byte(renderedStr)
 		for _, tag := range unresolved {
 			log.Warn(fmt.Sprintf("Could not evaluate ERB in %s: %s — leaving it unrendered (only ENV[...] and ENV.fetch(...) are supported)", configFile, tag))

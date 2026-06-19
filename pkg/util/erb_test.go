@@ -1,6 +1,8 @@
 package util
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,11 +36,12 @@ func TestRenderERB(t *testing.T) {
 		{"comment tag stripped", `before<%# secret %>after`, "beforeafter"},
 		{"no erb passes through", "database: plain-name", "database: plain-name"},
 		{"unrecognised expr left verbatim", `<%= Rails.env %>`, `<%= Rails.env %>`},
+		{"fetch with backtick command default", `<%= ENV.fetch("PGUSER", ` + "`whoami`.strip" + `) %>`, ""},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			out, _ := renderERB(tc.in)
+			out, _ := renderERB(tc.in, "")
 			assert.Equal(t, tc.out, out)
 		})
 	}
@@ -49,7 +52,7 @@ func TestRenderERBReportsUnresolved(t *testing.T) {
 
 	out, unresolved := renderERB(`a: <%= ENV["PGHOST"] %>
 b: <%= Rails.application.credentials.dig(:db) %>
-c: <%= ENV["MISSING"] || "ok" %>`)
+c: <%= ENV["MISSING"] || "ok" %>`, "")
 
 	assert.Equal(t, "a: db.internal\nb: <%= Rails.application.credentials.dig(:db) %>\nc: ok", out)
 	assert.Equal(t, []string{`<%= Rails.application.credentials.dig(:db) %>`}, unresolved)
@@ -69,6 +72,70 @@ func TestRenderERBFullConfig(t *testing.T) {
 		"  database: noticehub-app-dev\n" +
 		"  username: \n" + // empty value leaves the trailing space; YAML reads it as nil
 		"  pool: 10\n"
-	rendered, _ := renderERB(in)
+	rendered, _ := renderERB(in, "")
 	assert.Equal(t, out, rendered)
+}
+
+func TestRenderERBFileInclude(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	os.MkdirAll(configDir, 0o755)
+
+	os.WriteFile(filepath.Join(configDir, "database.creds.yml"), []byte(`  username: "admin"
+  password: "secret"`), 0o644)
+
+	in := `development:
+  adapter: postgresql
+  database: myapp_dev
+<%= ERB.new(File.read("#{Rails.root}/config/database.creds.yml")).result rescue nil %>
+`
+	rendered, unresolved := renderERB(in, root)
+
+	expected := `development:
+  adapter: postgresql
+  database: myapp_dev
+  username: "admin"
+  password: "secret"
+`
+	assert.Equal(t, expected, rendered)
+	assert.Empty(t, unresolved)
+}
+
+func TestRenderERBFileIncludeMissing(t *testing.T) {
+	root := t.TempDir()
+
+	in := `development:
+  database: myapp_dev
+<%= ERB.new(File.read("#{Rails.root}/config/database.creds.yml")).result rescue nil %>
+`
+	rendered, unresolved := renderERB(in, root)
+
+	expected := `development:
+  database: myapp_dev
+
+`
+	assert.Equal(t, expected, rendered)
+	assert.Empty(t, unresolved)
+}
+
+func TestRenderERBFileIncludeWithERB(t *testing.T) {
+	t.Setenv("DB_USER", "fromenv")
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	os.MkdirAll(configDir, 0o755)
+
+	os.WriteFile(filepath.Join(configDir, "creds.yml"), []byte(`  username: <%= ENV["DB_USER"] %>`), 0o644)
+
+	in := `development:
+  database: myapp_dev
+<%= ERB.new(File.read("#{Rails.root}/config/creds.yml")).result rescue nil %>
+`
+	rendered, unresolved := renderERB(in, root)
+
+	expected := `development:
+  database: myapp_dev
+  username: fromenv
+`
+	assert.Equal(t, expected, rendered)
+	assert.Empty(t, unresolved)
 }

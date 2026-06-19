@@ -12,9 +12,9 @@ import (
 // instead and tries to connect to a database literally named `<%= ... %>`.
 //
 // vmt has no Ruby runtime to lean on, so renderERB evaluates the small subset of
-// ERB that database.yml files actually use: reading environment variables, with
-// an optional default. Files without ERB tags (e.g. non-Ruby projects) pass
-// through untouched.
+// ERB that database.yml files actually use: reading environment variables (with
+// an optional default) and file includes via ERB.new(File.read("...")).result.
+// Files without ERB tags (e.g. non-Ruby projects) pass through untouched.
 
 // erbOutputRe matches an ERB output tag `<%= expr %>`, tolerating the
 // whitespace-trim markers Rails permits (`<%=- ... -%>`).
@@ -34,19 +34,43 @@ var envFetchRe = regexp.MustCompile(`^ENV\.fetch\(\s*['"]([^'"]+)['"]\s*(?:,\s*(
 // to the same value, so it is accepted too.
 var envIndexRe = regexp.MustCompile(`^ENV\[\s*['"]([^'"]+)['"]\s*\]\s*(?:\|\|=?\s*(.+?)\s*)?$`)
 
-// renderERB evaluates the ENV-reading ERB expressions in a database.yml file and
-// returns the rendered YAML alongside any output tags it could not evaluate. An
-// unrecognised tag is left verbatim, but since that verbatim text is itself valid
-// YAML it would not fail at parse time — it would silently become the value and
-// resurface later as an opaque connection error. The caller is expected to warn
-// about the returned tags so the limitation is visible.
-func renderERB(content string) (string, []string) {
+// fileReadRe matches `ERB.new(File.read("path")).result` with an optional
+// `rescue nil` suffix — a Rails idiom for conditionally including another
+// YAML fragment. The path may contain `#{Rails.root}` interpolation.
+var fileReadRe = regexp.MustCompile(`^ERB\.new\(\s*File\.read\(\s*"([^"]+)"\s*\)\s*\)\.result\s*(?:rescue\s+nil\s*)?$`)
+
+// rubyRootInterpolRe matches Ruby's `#{Rails.root}` string interpolation.
+var rubyRootInterpolRe = regexp.MustCompile(`#\{Rails\.root\}`)
+
+// renderERB evaluates ERB expressions in a database.yml file and returns the
+// rendered YAML alongside any output tags it could not evaluate. Supported
+// expressions: ENV[...], ENV.fetch(...), and ERB.new(File.read("...")).result.
+// rootDir is the project root used to resolve #{Rails.root} in file paths.
+// An unrecognised tag is left verbatim; the caller is expected to warn about
+// the returned tags so the limitation is visible.
+func renderERB(content string, rootDir string) (string, []string) {
+	return renderERBAt(content, rootDir, 0)
+}
+
+const maxIncludeDepth = 5
+
+func renderERBAt(content string, rootDir string, depth int) (string, []string) {
 	var unresolved []string
 
 	out := erbOutputRe.ReplaceAllStringFunc(content, func(tag string) string {
 		expr := erbOutputRe.FindStringSubmatch(tag)[1]
 		if value, ok := evalEnvExpr(expr); ok {
 			return value
+		}
+		if m := fileReadRe.FindStringSubmatch(expr); m != nil && depth < maxIncludeDepth {
+			path := rubyRootInterpolRe.ReplaceAllString(m[1], rootDir)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return ""
+			}
+			rendered, nested := renderERBAt(string(data), rootDir, depth+1)
+			unresolved = append(unresolved, nested...)
+			return rendered
 		}
 		unresolved = append(unresolved, tag)
 		return tag
@@ -85,6 +109,8 @@ func evalEnvExpr(expr string) (string, bool) {
 
 // unquote strips a single matched pair of surrounding quotes, leaving bare
 // literals (numbers, booleans) as-is. Ruby's `""` default becomes an empty string.
+// Backtick expressions (`cmd`) are Ruby shell commands we cannot evaluate; those
+// return "" so the result stays valid YAML.
 func unquote(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) >= 2 {
@@ -92,6 +118,9 @@ func unquote(s string) string {
 		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
 			return s[1 : len(s)-1]
 		}
+	}
+	if len(s) > 0 && s[0] == '`' {
+		return ""
 	}
 	return s
 }

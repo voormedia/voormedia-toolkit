@@ -1,3 +1,11 @@
+# v2.2.1
+
+* **Backtick shell-command defaults in ERB no longer break YAML parsing.** A `database.yml` that uses `` ENV.fetch("PGUSER", `whoami`.strip) `` caused a YAML parse error because the backtick is a reserved character in YAML. vmt now treats backtick expressions as unevaluable and substitutes an empty string, keeping the rendered YAML valid.
+
+# v2.2.0
+
+* **ERB file includes in `database.yml` are now supported.** Rails projects that use `<%= ERB.new(File.read("#{Rails.root}/config/database.creds.yml")).result rescue nil %>` to split database configuration across multiple files previously caused a YAML parse error, because the unrecognised ERB tag was left verbatim and broke the YAML structure. vmt now reads the included file, recursively renders any ERB inside it, and inlines the result — exactly as Rails does. When the included file doesn't exist (the `rescue nil` case), the tag evaluates to nothing, keeping the YAML valid. Includes are resolved up to 5 levels deep.
+
 # v2.1.0
 
 * **`vmt restore` now reads Rails `database.yml` files that use ERB.** Database names written as `<%= ENV.fetch("PGDATABASE") { "myapp-dev" } %>` previously caused a confusing "Couldn't connect to the target database" failure, because vmt fed the raw template text to Postgres as the database name. vmt now renders the env-reading expressions these files use — `<%= ENV["X"] %>`, `<%= ENV.fetch("X") { "default" } %>`, `<%= ENV.fetch("X", "default") %>`, and the `<%= ENV["X"] || "default" %>` and `<%= ENV["X"] ||= "default" %>` fallback forms — honouring environment variables and their defaults exactly as Rails does, before parsing the YAML. This also fixes the common `adapter: <%= ENV['DB_ADAPTER'] ||= 'postgresql' %>` line: without `||=` support it rendered to a bogus adapter and `vmt restore` defaulted to the MySQL port (3306) instead of Postgres' 5432. Any output tag it can't evaluate (e.g. `<%= Rails.application.credentials… %>`) is left untouched and reported with a warning, so an unsupported construct surfaces clearly instead of as a cryptic connection error. Config files without ERB (non-Ruby projects) are unaffected, and there's no new runtime dependency. Pass `--database` to override the file as before.
